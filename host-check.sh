@@ -9,24 +9,10 @@
 # ports. If Dropbear is detected then an "expect" script is executed to process
 # the passphrase (such as encrypted ZFS on Root and ZFS BootMenu prompts)
 #
-# ASSUMPTIONS:
-# 1) Dropbear connections are defined in the "~/.ssh/config" file with entries
-#    named "unlock-<hostname>", where hostname matches the name defined in the
-#    hostname() array.  Entries within "~/.ssh/config" should resemble:
-#
-#     Host unlock-testlinux
-#        Hostname testlinux.mydomain.com
-#        IdentityFile /home/user/.ssh/dropbear_ed25519_22-04
-#        user root
-#        IdentitiesOnly yes
-#        Port 222
-#        RequestTTY yes
-#        RemoteCommand zfsbootmenu
-#
-#          
+          
 AUTHOR="Richard J. Durso"
 RELDATE="08/27/2023"
-VERSION="0.02"
+VERSION="0.03"
 ##############################################################################
 
 ### [ Define Variables ] #####################################################
@@ -70,8 +56,9 @@ __usage() {
   -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
+  --debug           : Show expect screen scrape in progress.
 
-  ${0##*/} [-flags] [-a | -all | <hostname>] ['passphrase']
+  ${0##*/} [--debug] [-flags] [-a | -all | <hostname>] ['passphrase']
 
   Note: passphrase should be wrapped in single-quotes when used.
   "
@@ -160,6 +147,11 @@ expect {
     exp_continue
   }
 
+  # This woudl be seen with traditional ZFS on Root
+  "Pool Decrypted" {
+    set ret 0
+    exp_continue
+  }
   # This would be seen with ZBM and incorrect passphrase
   "No boot environments" {
     set ret 1
@@ -175,12 +167,16 @@ expect {
 exit \$ret
 EOF
 
-    # normal usage hides all output of spawened processes
-    output=$("$tmp_expect_script" "$passphrase")
-    
-    # Switch to this one instead to debug / see output
-    #"$tmp_expect_script" "$passphrase"
-    result=$?
+    if [ "$DEBUG" == "$TRUE" ]; then
+      # Switch to this one instead to debug / see output
+      "$tmp_expect_script" "$passphrase"
+      result=$?
+    else
+      # normal usage hides all output of spawened processes
+      output=$("$tmp_expect_script" "$passphrase")
+      result=$?
+    fi
+    # Cleanup temp file    
     rm "$tmp_expect_script"
     return $result
   else
@@ -255,13 +251,14 @@ __detect_ssh_ports() {
 # detect if Dropbear ports are opened, if detected it will attempt to answer
 # passphrase prompt with the supplied passphrase
 __process_all_hostnames() {
+  local passphrase="$1"
   local result=1
 
   for hostname in "${hostnames[@]}"; do
     __detect_ssh_ports "$hostname"
     result=$?
     if [ $result -ne 0 ]; then
-        __detect_dropbear_port "$hostname"
+        __detect_dropbear_port "$hostname" "$passphrase"
         result=$?
         if [ $result -eq 0 ]; then
           # Passphrase was answered correctly
@@ -293,6 +290,11 @@ __list_hosts_and_ports() {
     echo "$port"
   done
 }
+
+FALSE=0
+TRUE=1
+DEBUG="$FALSE"
+
 # --- [ Process Argument List ]-----------------------------------------------
 if [ "$#" -ne 0 ]; then
   while [ "$#" -gt 0 ]
@@ -306,6 +308,9 @@ if [ "$#" -ne 0 ]; then
       hostname=$2
       passphrase=$3
       __detect_dropbear_port "$hostname" "$passphrase"
+      ;;
+    --debug)
+      DEBUG="$TRUE"
       ;;
     -h|--help)
       __usage
