@@ -26,22 +26,22 @@
 #          
 AUTHOR="Richard J. Durso"
 RELDATE="08/27/2023"
-VERSION="0.01"
+VERSION="0.02"
 ##############################################################################
 
 ### [ Define Variables ] #####################################################
-
-# Webhook Notifications used in __send_notification() subroutine
-webhook="https://hooks.slack.com/<WEBHOOK_HERE>"
 
 # Define array of hostnames to loop over:
 hostnames=("k3s01" "k3s02" "k3s03" "k3s04" "k3s05" "k3s06")
 
 # Define array of possible SSH ports to check:
-ssh_ports=("22" "2244")
+ssh_ports=("22")
 
 # Define array of possible Dropbear ports to check:
 dropbear_ports=("222" "2222")
+
+# Webhook Notifications used in __send_notification() subroutine
+webhook="https://hooks.slack.com/<WEBHOOK_HERE>"
 
 ### [ Routines ] #############################################################
 required_utils=("expect" "nc" "curl")
@@ -88,7 +88,7 @@ __send_notification() {
   if [ -n "$message" ]; then
     if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook" > /dev/null 2> /dev/null
     then
-      echo "-- -- Notification sent."
+      echo "-- -- Notification sent"
     fi
   fi
 }
@@ -203,7 +203,7 @@ __detect_dropbear_port() {
       result=$?
 
       if [ $result -eq 0 ]; then
-        echo "-- -- Dropbear port $port is open on $hostname."
+        echo "-- -- Dropbear port $port is open on $hostname"
         __answer_passphrase "$hostname" "$passphrase"
         if [ $? -eq 0 ]; then
           echo "-- -- No error detected in passphrase exchange"
@@ -214,7 +214,7 @@ __detect_dropbear_port() {
           __send_notification "ERROR: Dropbear passphrase failed with: $hostname"
         fi
       else
-        echo "-- -- Dropbear port $port is not open on $hostname."
+        echo "-- -- Dropbear port $port is not open on $hostname"
       fi
     done
     return $result
