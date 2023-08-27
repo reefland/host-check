@@ -90,9 +90,18 @@ There are 2 routines within the script you may want to consider making modificat
   * The example shows self-hosted kubernetes nodes having a `taint` applied which notified the rest of the cluster that this host will not be available until a human does something.
   * The variable `$hostname` will contain the name of the host having an issue.
 
+* `__answer_passphrase()` can be modified if you use LUKS encryption.  You would add an entry with the passphrase text prompt to look for modeled after this entry:
+
+  ```text
+  "Enter passphrase" {
+  send -- "\$PASS\r"
+  exp_continue
+  }
+  ```
+
 ---
 
-### Passprhase(s)
+### Passphrase(s)
 
 This Host-Check BASH script does not store any passphrases. You will need to supply the passphrase via a command line argument. How passphrases are stored, retrieved, and passed to the script is up to you.
 
@@ -131,64 +140,93 @@ $ ls -l /usr/local/bin/host-check.sh
   -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
+  --debug           : Show expect screen scrape in progress.
 
   host-check.sh [-flags] [-a | -all | <hostname>] ['passphrase']
 
   Note: passphrase should be wrapped in single-quotes when used.
 ```
 
-#### Examples Usage
+---
 
-Individual Host with Successful Passphrase:
+#### Examples
 
-```shell
-$  host-check.sh -d testlinux 'myPassphrase'
+1. Individual Host with Successful Passphrase:
 
--- Dropbear check on host: testlinux
-Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
--- -- Dropbear port 222 is open on testlinux
--- -- Attempting Dropbear passphrase on testlinux
--- -- No error detected in passphrase exchange
--- -- Notification sent
-```
+    ```shell
+    $  host-check.sh -d testlinux 'myPassphrase'
 
-NOTE: The passphrase must be wrapped in single-quotes to prevent BASH, ZSH, Linux for acting on special characters.
+    -- Dropbear check on host: testlinux
+    Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
+    -- -- Dropbear port 222 is open on testlinux
+    -- -- Attempting Dropbear passphrase on testlinux
+    -- -- No error detected in passphrase exchange
+    -- -- Notification sent
+    ```
 
-* Slack Webhook notification:
-  ![slack notification example](./docs/slack_notification_sucessful.png)
+    NOTE: The passphrase must be wrapped in single-quotes to prevent BASH, ZSH, Linux for acting on special characters.
 
-Scan all defined hosts:
+    * Slack Webhook notification:
+      ![slack notification example](./docs/slack_notification_sucessful.png)
 
-```shell
-$ host-check.sh -a
+2. Individual Host with Debug Mode and Successful Passphrase:
 
-Connection to k3s01 (192.168.10.215) 22 port [tcp/*] succeeded!
-Connection to k3s02 (192.168.10.216) 22 port [tcp/*] succeeded!
-Connection to k3s03 (192.168.10.217) 22 port [tcp/*] succeeded!
-Connection to k3s04 (192.168.10.218) 22 port [tcp/*] succeeded!
-Connection to k3s05 (192.168.10.219) 22 port [tcp/*] succeeded!
-Connection to k3s06 (192.168.10.210) 22 port [tcp/*] succeeded!
-```
+    ```shell
+    $  host-check.sh --debug -d testlinux 'myPassphrase'
 
-* All hosts are up with SSH ports open, nothing to do!
+    -- Dropbear check on host: testlinux
+    Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
+    -- -- Dropbear port 222 is open on testlinux
+    -- -- Attempting Dropbear passphrase on testlinux
+    spawn ssh unlock-testlinux
+    Enter passphrase for 'rpool':
+    1 / 1 key(s) successfully loaded
+    ZFS Root Pool Decrypted
+    -- -- No error detected in passphrase exchange
+    -- -- Notification sent
+    ```
 
-List Current Configuration:
+    * The `--debug` mode enabled the expect screen scrape to be visible:
 
-```shell
-$ host-check.sh -l
+      ```text
+      spawn ssh unlock-testlinux
+      Enter passphrase for 'rpool':
+      1 / 1 key(s) successfully loaded
+      ZFS Root Pool Decrypted
+      ```
 
-Hostname(s) defined:
-k3s01
-k3s02
-k3s03
-k3s04
-k3s05
-k3s06
+3. Scan all defined hosts:
 
-SSH port(s) defined:
-22
+    ```shell
+    $ host-check.sh -a
 
-Dropbear port(s) defined:
-222
-2222
-```
+    Connection to k3s01 (192.168.10.215) 22 port [tcp/*] succeeded!
+    Connection to k3s02 (192.168.10.216) 22 port [tcp/*] succeeded!
+    Connection to k3s03 (192.168.10.217) 22 port [tcp/*] succeeded!
+    Connection to k3s04 (192.168.10.218) 22 port [tcp/*] succeeded!
+    Connection to k3s05 (192.168.10.219) 22 port [tcp/*] succeeded!
+    Connection to k3s06 (192.168.10.210) 22 port [tcp/*] succeeded!
+    ```
+
+    * All hosts are up with SSH ports open, nothing to do!
+
+4. List Current Configuration:
+
+    ```shell
+    $ host-check.sh -l
+
+    Hostname(s) defined:
+    k3s01
+    k3s02
+    k3s03
+    k3s04
+    k3s05
+    k3s06
+
+    SSH port(s) defined:
+    22
+
+    Dropbear port(s) defined:
+    222
+    2222
+    ```
