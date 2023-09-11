@@ -11,8 +11,8 @@
 #
           
 AUTHOR="Richard J. Durso"
-RELDATE="08/27/2023"
-VERSION="0.03"
+RELDATE="09/10/2023"
+VERSION="0.04"
 ##############################################################################
 
 ### [ Define Variables ] #####################################################
@@ -30,7 +30,7 @@ dropbear_ports=("222" "2222")
 webhook="https://hooks.slack.com/<WEBHOOK_HERE>"
 
 ### [ Routines ] #############################################################
-required_utils=("expect" "nc" "curl")
+required_utils=("expect" "nc" "curl" "strings")
 
 # Confirm required utilities are installed.
 for util in "${required_utils[@]}"; do
@@ -50,14 +50,14 @@ __usage() {
   the script will enter the passphrase to allow the remote system to resume
   its boot process.
 
+  --debug           : Show expect screen scrape in progress.
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
   -d, --dropbear    : Detect if dropbear ports are open on specified host.
   -l, --list        : List defined hostnames and ports within the script.
   -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
-  --debug           : Show expect screen scrape in progress.
-
+  
   ${0##*/} [--debug] [-flags] [-a | -all | <hostname>] ['passphrase']
 
   Note: passphrase should be wrapped in single-quotes when used.
@@ -117,6 +117,7 @@ __answer_passphrase(){
   local passphrase="$2"
   local result=1
   local tmp_expect_script="/tmp/host_check.exp"
+  local tmp_expect_log="/tmp/host_check.log"
 
   echo "-- -- Attempting Dropbear passphrase on $hostname"
 
@@ -127,8 +128,10 @@ __answer_passphrase(){
 cat >"$tmp_expect_script" <<EOF
 #!/usr/bin/expect -f
 set timeout 30
+log_file -noappend $tmp_expect_log
 set PASS [lindex \$argv 0]
 spawn ssh unlock-$hostname
+sleep 2
 # default return code is failure
 set ret 1
 
@@ -136,6 +139,17 @@ set ret 1
 expect {
   "Enter passphrase" {
     send -- "\$PASS\r"
+    send_log -- "DEBUG: passphrase entered"
+    exp_continue
+  }
+
+  # ZBM Welcome Banner
+  "Welcome to the ZFSBootMenu initramfs shell" {
+    send -- "zbm\r"
+    sleep 1
+    send -- "\r"
+    set ret 0
+    send_log -- "DEBUG: zbm sent to ZBM Welcome Banner"
     exp_continue
   }
 
@@ -144,40 +158,45 @@ expect {
     sleep 1
     set ret 0
     send -- "\r"
+    send_log -- "DEBUG: snapshot keyword detected"
     exp_continue
   }
 
   # This woudl be seen with traditional ZFS on Root
   "Pool Decrypted" {
     set ret 0
+    send_log -- "DEBUG: Pool Decrypted keywords detected"
     exp_continue
   }
+
   # This would be seen with ZBM and incorrect passphrase
   "No boot environments" {
     set ret 1
+    send_log -- "DEBUG: No boot environments detected"
     exit
   }
 
   # Logoin prompt would be a good sign too
   "login:" {
     set ret 0
+    send_log -- "DEBUG: Login prompt detected"
     exit
   }
 }
 exit \$ret
 EOF
 
+    output=$("$tmp_expect_script" "$passphrase")
+    result=$?
+
     if [ "$DEBUG" == "$TRUE" ]; then
-      # Switch to this one instead to debug / see output
-      "$tmp_expect_script" "$passphrase"
-      result=$?
-    else
-      # normal usage hides all output of spawened processes
-      output=$("$tmp_expect_script" "$passphrase")
-      result=$?
+      # Strip out ANSI color and cursor codes used by ZFS Boot Menu if present
+      echo "-- -- DEBUG:"
+      output=$(sed 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g' < "$tmp_expect_log" | strings) 
+      echo "$output"
     fi
     # Cleanup temp file    
-    rm "$tmp_expect_script"
+    rm "$tmp_expect_script" "$tmp_expect_log"
     return $result
   else
     echo "error: passphrase required (be sure to wrap passphrase within single quotes!)" >&2
