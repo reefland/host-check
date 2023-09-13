@@ -41,6 +41,7 @@ The following packages are required to be installed:
 * `expect` - this does the text parsing of SSH prompts and enters the provided passphrase.
 * `nc` - is used to detect if remote SSH ports are opened.
 * `curl` - used to send webhook notifications.
+* `strings` - used to filter non-printable characters when `--debug` mode is enabled
 
 ---
 
@@ -109,7 +110,7 @@ This Host-Check BASH script does not store any passphrases. You will need to sup
 
 #### Installation
 
-Download a copy of the script and place it where you like.  You can `install` it as well:
+Download a copy of the script and place it where you like. Once downloaded, you use `install`:
 
 ```shell
 $ sudo install host-check.sh /usr/local/bin
@@ -119,7 +120,7 @@ $ ls -l /usr/local/bin/host-check.sh
 -rwxr-xr-x 1 root root 9710 Aug 26 18:27 /usr/local/bin/host-check.sh
 ```
 
-* Once configured add to a crontab to run hourly or as needed.
+* Once configured [create systemd timer](./docs/create_systemd_timer.md) to run the host-check script as needed.
 
 ---
 
