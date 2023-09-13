@@ -9,10 +9,10 @@
 # ports. If Dropbear is detected then an "expect" script is executed to process
 # the passphrase (such as encrypted ZFS on Root and ZFS BootMenu prompts)
 #
-          
+
 AUTHOR="Richard J. Durso"
-RELDATE="09/10/2023"
-VERSION="0.04"
+RELDATE="09/13/2023"
+VERSION="0.05"
 ##############################################################################
 
 ### [ Define Variables ] #####################################################
