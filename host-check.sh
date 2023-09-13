@@ -139,7 +139,9 @@ set ret 1
 expect {
   "Enter passphrase" {
     send -- "\$PASS\r"
-    send_log -- "DEBUG: passphrase entered"
+    send_log -- "\rDEBUG: passphrase entered\r"
+    sleep 1 
+    send -- "\r" 
     exp_continue
   }
 
@@ -149,7 +151,7 @@ expect {
     sleep 1
     send -- "\r"
     set ret 0
-    send_log -- "DEBUG: zbm sent to ZBM Welcome Banner"
+    send_log -- "\rDEBUG: zbm sent to ZBM Welcome Banner\r"
     exp_continue
   }
 
@@ -158,28 +160,28 @@ expect {
     sleep 1
     set ret 0
     send -- "\r"
-    send_log -- "DEBUG: snapshot keyword detected"
+    send_log -- "\rDEBUG: snapshot keyword detected\r"
     exp_continue
   }
 
   # This woudl be seen with traditional ZFS on Root
   "Pool Decrypted" {
     set ret 0
-    send_log -- "DEBUG: Pool Decrypted keywords detected"
+    send_log -- "\rDEBUG: Pool Decrypted keywords detected\r"
     exp_continue
   }
 
   # This would be seen with ZBM and incorrect passphrase
   "No boot environments" {
     set ret 1
-    send_log -- "DEBUG: No boot environments detected"
+    send_log -- "\rDEBUG: No boot environments detected\r"
     exit
   }
 
   # Logoin prompt would be a good sign too
   "login:" {
     set ret 0
-    send_log -- "DEBUG: Login prompt detected"
+    send_log -- "\rDEBUG: Login prompt detected\r"
     exit
   }
 }
