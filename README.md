@@ -47,35 +47,39 @@ The following packages are required to be installed:
 
 ### Configuration
 
-The script currently does not have an external configuration file.  You can adjust the following variables to suit you needs:
+Configuration is defined via an external configuration file.
+
+* The default location is: `$HOME/.config/host-check/host-check.conf`
+  * An alternate file can be specified with the `--config` parameter
+
+#### Example Configuration File
+
+```text
+# Define array of hostnames to loop over:
+hostnames=("k3s01" "k3s02" "k3s03" "k3s04" "k3s05" "k3s06")
+
+# Define array of possible SSH ports to check:
+ssh_ports=("22")
+
+# Define array of possible Dropbear ports to check:
+dropbear_ports=("222" "2222")
+
+# Webhook Notifications used in __send_notification() subroutine
+webhook="https://hooks.slack.com/<webhook_uri_here>"
+
+# Passphrase to unlock remote dropbear volumes (Use single quotes!) 
+passphrase='mySecret!'
+```
 
 * `hostnames` is BASH array of hostnames that will be checked each time the script is run when a `-a` or `--all` parameter is passed.
-
-  ```bash
-  # Define array of hostnames to loop over:
-  hostnames=("k3s01" "k3s02" "k3s03" "k3s04" "k3s05" "k3s06")
-  ```
-
 * `ssh_ports` is a BASH array of SSH port numbers to check. Typically just `22` is used, but alternate ports can be specified.
-
-  ```bash
-  # Define array of possible SSH ports to check:
-  ssh_ports=("22")
-  ```
-
-  * If any of these ports are detected to be `open` then the remote host is fully booted and not waiting for a passphrase.  No other action is taken, next host is checked.
-
+  * If any of the `ssh_ports` ports are detected to be `open` then the remote host is fully booted and not waiting for a passphrase.  No other action is taken, next host is checked.
 * `dropbear_ports` is a BASH array of SSH port numbers to check. Typical numbers are `222` or `2222`, additional ports can be added if needed.
-
-  ```bash
-  # Define array of possible Dropbear ports to check:
-  dropbear_ports=("222" "2222")
-  ```
-
   * If any of these ports are detected to be `open` then the host is waiting for a passphrase. The Host-Check script will then attempt to answer the passphrase prompt.
   * If the remote host has neither SSH or Dropbear ports open, then the host is powered off, hung or some other error condition.  A notification can be sent when this is detected.
-
 * `webhook` can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Mattermost, etc.
+* `passphrase` is the password or passphrase needed to unlock remote disk volumes via Dropbear.
+  * This value needs to be wrapped by single-quotes to prevent shell processing of special characters.
 
 ---
 
@@ -95,16 +99,13 @@ There are 2 routines within the script you may want to consider making modificat
 
   ```text
   "Enter passphrase" {
-  send -- "\$PASS\r"
-  exp_continue
+    send -- "\$PASS\r"
+    send_log -- "\rDEBUG: passphrase entered\r"
+    sleep 1 
+    send -- "\r" 
+    exp_continue
   }
   ```
-
----
-
-### Passphrase(s)
-
-This Host-Check BASH script does not store any passphrases. You will need to supply the passphrase via a command line argument. How passphrases are stored, retrieved, and passed to the script is up to you.
 
 ---
 
@@ -120,6 +121,7 @@ $ ls -l /usr/local/bin/host-check.sh
 -rwxr-xr-x 1 root root 9710 Aug 26 18:27 /usr/local/bin/host-check.sh
 ```
 
+* Create configuration file `$HOME/.config/host-check/host-check.conf` as outlined above.
 * Once configured [create systemd timer](./docs/create_systemd_timer.md) to run the host-check script as needed.
 
 ---
@@ -127,6 +129,8 @@ $ ls -l /usr/local/bin/host-check.sh
 ### Usage Statement
 
 ```text
+  host-check.sh | Version: 0.06 | 09/13/2023 | Richard J. Durso
+
   Check if hosts are stuck at Dropbear passphrase prompt.
   ----------------------------------------------------------------------------
 
@@ -135,17 +139,18 @@ $ ls -l /usr/local/bin/host-check.sh
   the script will enter the passphrase to allow the remote system to resume
   its boot process.
 
+  --debug           : Show expect screen scrape in progress.
+  -c, --config      : Full path and name of configuration file.
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
   -d, --dropbear    : Detect if dropbear ports are open on specified host.
   -l, --list        : List defined hostnames and ports within the script.
   -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
-  --debug           : Show expect screen scrape in progress.
+  
+  host-check.sh [--debug] [-c <path/name.config>] [-flags] [-a | <hostname>]
 
-  host-check.sh [-flags] [-a | -all | <hostname>] ['passphrase']
-
-  Note: passphrase should be wrapped in single-quotes when used.
+  Default configuration file: /home/user/.config/host-check/host-check.conf
 ```
 
 ---
@@ -155,7 +160,7 @@ $ ls -l /usr/local/bin/host-check.sh
 1. Individual Host with Successful Passphrase:
 
     ```shell
-    $  host-check.sh -d testlinux 'myPassphrase'
+    $  host-check.sh -d testlinux
 
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
@@ -173,7 +178,7 @@ $ ls -l /usr/local/bin/host-check.sh
 2. Individual Host with Debug Mode and Successful Passphrase:
 
     ```shell
-    $  host-check.sh --debug -d testlinux 'myPassphrase'
+    $  host-check.sh --debug -d testlinux
 
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
@@ -230,4 +235,6 @@ $ ls -l /usr/local/bin/host-check.sh
     Dropbear port(s) defined:
     222
     2222
+
+    Unlock passphrase has been defined.
     ```

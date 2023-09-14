@@ -20,13 +20,12 @@ Description=Check Remote Hosts for Dropbear prompts
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/host-check.sh --debug -a 'myPasswrd' 
+ExecStart=/usr/local/bin/host-check.sh --debug -a 
 
 [Install]
 WantedBy=default.target
 ```
 
-* Replace `'myPasswrd'` with the passphrase needed with remote Dropbear sessions to unlock disk volumes. Be sure to wrap your passphrase within single quotes (`'`) as shown
 * `--debug` enabled more detailed logging such as messages from SSH screen scrape
 * `-a` will scan all defined hostnames
 
@@ -99,7 +98,12 @@ systemctl --user start hostcheck.timer
 ### Monitor Timer Service
 
 ```bash
-journalctl --user -u hostcheck.service -b -f
+$ journalctl -b -f | grep "host-check.sh"
+
+Sep 13 21:20:01 dldsk01 host-check.sh[3267113]: -- Loading configuration file: /home/user/.config/host-check/host-check.conf
+Sep 13 21:20:01 dldsk01 host-check.sh[3267118]: Connection to k3s01 (192.168.10.215) 22 port [tcp/*] succeeded!
+Sep 13 21:20:01 dldsk01 host-check.sh[3267119]: Connection to k3s02 (192.168.10.216) 22 port [tcp/*] succeeded!
+Sep 13 21:20:01 dldsk01 host-check.sh[3267120]: Connection to k3s03 (192.168.10.217) 22 port [tcp/*] succeeded!
 ```
 
 * `-b` show this boot only

@@ -12,22 +12,8 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/13/2023"
-VERSION="0.05"
+VERSION="0.06"
 ##############################################################################
-
-### [ Define Variables ] #####################################################
-
-# Define array of hostnames to loop over:
-hostnames=("k3s01" "k3s02" "k3s03" "k3s04" "k3s05" "k3s06")
-
-# Define array of possible SSH ports to check:
-ssh_ports=("22")
-
-# Define array of possible Dropbear ports to check:
-dropbear_ports=("222" "2222")
-
-# Webhook Notifications used in __send_notification() subroutine
-webhook="https://hooks.slack.com/<WEBHOOK_HERE>"
 
 ### [ Routines ] #############################################################
 required_utils=("expect" "nc" "curl" "strings")
@@ -51,6 +37,7 @@ __usage() {
   its boot process.
 
   --debug           : Show expect screen scrape in progress.
+  -c, --config      : Full path and name of configuration file.
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
   -d, --dropbear    : Detect if dropbear ports are open on specified host.
   -l, --list        : List defined hostnames and ports within the script.
@@ -58,9 +45,9 @@ __usage() {
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
   
-  ${0##*/} [--debug] [-flags] [-a | -all | <hostname>] ['passphrase']
+  ${0##*/} [--debug] [-c <path/name.config>] [-flags] [-a | <hostname>]
 
-  Note: passphrase should be wrapped in single-quotes when used.
+  Default configuration file: ${configfile}
   "
 }
 
@@ -72,7 +59,7 @@ __send_notification() {
   local message="$1"
 
   # Send notification via webhook
-  if [ -n "$message" ]; then
+  if [[ -n "$message" ]]; then
     if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook" > /dev/null 2> /dev/null
     then
       echo "-- -- Notification sent"
@@ -121,7 +108,7 @@ __answer_passphrase(){
 
   echo "-- -- Attempting Dropbear passphrase on $hostname"
 
-  if [ -n "$passphrase" ]; then
+  if [[ -n "$passphrase" ]]; then
     touch "$tmp_expect_script"
     chmod 700 "$tmp_expect_script"
 
@@ -201,7 +188,7 @@ EOF
     rm "$tmp_expect_script" "$tmp_expect_log"
     return $result
   else
-    echo "error: passphrase required (be sure to wrap passphrase within single quotes!)" >&2
+    echo "error: passphrase required in config file (be sure to wrap passphrase within single quotes!)" >&2
     exit 1
   fi
 }
@@ -212,7 +199,7 @@ __detect_dropbear_port() {
   local passphrase="$2"
   local result=1
 
-  if [ -n "$hostname" ]; then
+  if [[ -n "$hostname" ]]; then
     echo "-- Dropbear check on host: $hostname"
 
     for port in "${dropbear_ports[@]}"; do
@@ -221,8 +208,9 @@ __detect_dropbear_port() {
 
       if [ $result -eq 0 ]; then
         echo "-- -- Dropbear port $port is open on $hostname"
-        __answer_passphrase "$hostname" "$passphrase"
-        if [ $? -eq 0 ]; then
+        
+        if __answer_passphrase "$hostname" "$passphrase"
+        then
           echo "-- -- No error detected in passphrase exchange"
           __send_notification "Successful dropbear passphrase given to: $hostname"
           break
@@ -247,7 +235,7 @@ __detect_ssh_ports() {
   local hostname="$1"
   local result=1
 
-  if [ -n "$hostname" ]; then
+  if [[ -n "$hostname" ]]; then
     for port in "${ssh_ports[@]}"; do
       nc -z -w1 "$hostname" "$port"
       result=$?
@@ -288,8 +276,8 @@ __process_all_hostnames() {
           # Process user defined steps to handle failed dropbear
           __dropbear_failed_payload "$hostname"
         fi
+        echo
       fi
-    echo
   done
 }
 
@@ -300,21 +288,53 @@ __list_hosts_and_ports() {
   for hostname in "${hostnames[@]}"; do
     echo "$hostname"
   done
+
   echo
   echo "SSH port(s) defined:"
   for port in "${ssh_ports[@]}"; do
     echo "$port"
   done
+
   echo
   echo "Dropbear port(s) defined:"
   for port in "${dropbear_ports[@]}"; do
     echo "$port"
   done
+  
+  echo
+  if [[ -n "$passphrase" ]]; then
+    echo "Unlock passphrase has been defined."
+  else
+    echo "WARNING: passphrase unlock not defined!"
+  fi
 }
 
+# --- [ Load Configuration File ]---------------------------------------------
+__load_config_file() {
+  local configfile="$1"
+
+  echo "-- Loading configuration file: $configfile"
+  if [ -f "$configfile" ]; then
+    # shellcheck source=/dev/null
+    source "$configfile"
+  else
+    echo "error: configuration file not found." >&2
+    exit 2
+  fi
+}
+
+# --- [ Define Constants / Default Values ]------------------------------------
 FALSE=0
 TRUE=1
 DEBUG="$FALSE"
+
+# Default values, use the config file to override these!
+configfile="$HOME/.config/host-check/host-check.conf"
+hostnames=("localhost")
+ssh_ports=("22")
+dropbear_ports=("222")
+webhook="not_defined"
+passphrase=
 
 # --- [ Process Argument List ]-----------------------------------------------
 if [ "$#" -ne 0 ]; then
@@ -322,12 +342,15 @@ if [ "$#" -ne 0 ]; then
   do
     case "$1" in
     -a|--all)
-      passphrase=$2
+      __load_config_file "$configfile"
       __process_all_hostnames "$passphrase"
+      ;;
+    -c|--config)
+      configfile=$2
       ;;
     -d|--dropbear)
       hostname=$2
-      passphrase=$3
+      __load_config_file "$configfile"
       __detect_dropbear_port "$hostname" "$passphrase"
       ;;
     --debug)
@@ -338,10 +361,12 @@ if [ "$#" -ne 0 ]; then
       exit 0
       ;;
     -l|--list)
+      __load_config_file "$configfile"
       __list_hosts_and_ports
       ;;
     -s|--ssh)
       hostname=$2
+      __load_config_file "$configfile"
       __detect_ssh_ports "$hostname"
       ;;
     -v|--version)
