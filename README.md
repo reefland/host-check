@@ -64,6 +64,13 @@ ssh_ports=("22")
 # Define array of possible Dropbear ports to check:
 dropbear_ports=("222" "2222")
 
+# Define how many times dropbear connection should be tried before
+# determining host down. Allow enough time typical system initialization
+dropbear_retries="6"
+
+# How many seconds delay between dropbear connection attempts
+dropbear_retry_delay="20"
+
 # Webhook Notifications used in __send_notification() subroutine
 webhook="https://hooks.slack.com/<webhook_uri_here>"
 
@@ -77,6 +84,8 @@ passphrase='mySecret!'
 * `dropbear_ports` is a BASH array of SSH port numbers to check. Typical numbers are `222` or `2222`, additional ports can be added if needed.
   * If any of these ports are detected to be `open` then the host is waiting for a passphrase. The Host-Check script will then attempt to answer the passphrase prompt.
   * If the remote host has neither SSH or Dropbear ports open, then the host is powered off, hung or some other error condition.  A notification can be sent when this is detected.
+* `dropbear_retries` is an integer number of how many times to check all defined Dropbear ports for a connection before returning a failed/host down status.
+* `dropbear_retry_delay` is an integer number of how many seconds to wait between Dropbear connection attempts.
 * `webhook` can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Mattermost, etc.
 * `passphrase` is the password or passphrase needed to unlock remote disk volumes via Dropbear.
   * This value needs to be wrapped by single-quotes to prevent shell processing of special characters.
@@ -221,6 +230,7 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $ host-check.sh -l
 
+    -- host-check.sh 0.09: Loading configuration file: /home/user/.config/host-check/host-check.conf
     Hostname(s) defined:
     k3s01
     k3s02
@@ -232,6 +242,7 @@ $ ls -l /usr/local/bin/host-check.sh
     SSH port(s) defined:
     22
 
+    Dropbear will be tried 6 times at 20 second intervals
     Dropbear port(s) defined:
     222
     2222

@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/15/2023"
-VERSION="0.08"
+VERSION="0.09"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -156,7 +156,7 @@ expect {
     send -- "\$PASS\r"
     send_log -- "\rDEBUG: passphrase entered\r"
     sleep 1 
-    # send -- "\r" 
+    set ret 0
     exp_continue
   }
 
@@ -212,30 +212,36 @@ __detect_dropbear_port() {
   local hostname="$1"
   local passphrase="$2"
   local result=1
+  local retries=0
 
   if [[ -n "$hostname" ]]; then
-    echo "-- Dropbear check on host: $hostname"
+    for retries in $(seq "${dropbear_retries}")
+    do
+      echo "-- Dropbear check on host: $hostname (${retries} of ${dropbear_retries})"
+      for port in "${dropbear_ports[@]}"; do
+        nc -z -w1 "$hostname" "$port"
+        result=$?
 
-    for port in "${dropbear_ports[@]}"; do
-      nc -z -w1 "$hostname" "$port"
-      result=$?
-
-      if [ $result -eq 0 ]; then
-        echo "-- -- Dropbear port $port is open on $hostname"
-        
-        if __answer_passphrase "$hostname" "$passphrase"
-        then
-          echo "-- -- No error detected in passphrase exchange"
-          __send_notification "Successful dropbear passphrase given to: $hostname"
-          break
+        if [ $result -eq 0 ]; then
+          echo "-- -- Dropbear port $port is open on $hostname"
+          
+          if __answer_passphrase "$hostname" "$passphrase"
+          then
+            echo "-- -- No error detected in passphrase exchange"
+            __send_notification "Successful dropbear passphrase given to: $hostname"
+            break 2
+          else
+            echo "-- -- Error detected during passphrase exchange"
+            __send_notification "ERROR: Dropbear passphrase failed with: $hostname"
+          fi
         else
-          echo "-- -- Error detected during passphrase exchange"
-          __send_notification "ERROR: Dropbear passphrase failed with: $hostname"
+          echo "-- -- Dropbear port $port is not open on $hostname"
         fi
-      else
-        echo "-- -- Dropbear port $port is not open on $hostname"
-      fi
-    done
+      done # ports
+
+      sleep "$dropbear_retry_delay"
+    done # retries
+
     return $result
   else
     __error_message "error: hostname required"
@@ -310,6 +316,7 @@ __list_hosts_and_ports() {
   done
 
   echo
+  echo "Dropbear will be tried ${dropbear_retries} times at ${dropbear_retry_delay} second intervals"
   echo "Dropbear port(s) defined:"
   for port in "${dropbear_ports[@]}"; do
     echo "$port"
@@ -347,6 +354,8 @@ configfile="$HOME/.config/host-check/host-check.conf"
 hostnames=("localhost")
 ssh_ports=("22")
 dropbear_ports=("222")
+dropbear_retries="3"
+dropbear_retry_delay="30"
 webhook="not_defined"
 passphrase=
 
