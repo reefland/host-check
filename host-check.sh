@@ -11,8 +11,8 @@
 #
 
 AUTHOR="Richard J. Durso"
-RELDATE="09/14/2023"
-VERSION="0.07"
+RELDATE="09/15/2023"
+VERSION="0.08"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -131,11 +131,32 @@ set ret 1
 
 # These prompts can be used in any order.
 expect {
+  # This would be seen with ZBM and incorrect passphrase
+  "No boot environments" {
+    set ret 1
+    send_log -- "\rDEBUG: No boot environments detected\r"
+    exit \$ret
+  }
+
+  # This would be seen with incorrect ZFS unlock key
+  "Key load error:" {
+    set ret 1
+    send_log -- "\rDEBUG: Key load error detected\r"
+    exit \$ret
+  }
+
+  # Logoin prompt would be a good sign too
+  "login:" {
+    set ret 0
+    send_log -- "\rDEBUG: Login prompt detected\r"
+    exit \$ret
+  }
+
   "Enter passphrase" {
     send -- "\$PASS\r"
     send_log -- "\rDEBUG: passphrase entered\r"
     sleep 1 
-    send -- "\r" 
+    # send -- "\r" 
     exp_continue
   }
 
@@ -143,8 +164,7 @@ expect {
   "Welcome to the ZFSBootMenu initramfs shell" {
     send -- "zbm\r"
     sleep 1
-    send -- "\r"
-    set ret 0
+    # send -- "\r"
     send_log -- "\rDEBUG: zbm sent to ZBM Welcome Banner\r"
     exp_continue
   }
@@ -165,29 +185,16 @@ expect {
     exp_continue
   }
 
-  # This would be seen with ZBM and incorrect passphrase
-  "No boot environments" {
-    set ret 1
-    send_log -- "\rDEBUG: No boot environments detected\r"
-    exit
-  }
-
-  # Logoin prompt would be a good sign too
-  "login:" {
-    set ret 0
-    send_log -- "\rDEBUG: Login prompt detected\r"
-    exit
-  }
 }
 exit \$ret
 EOF
 
-    output=$("$tmp_expect_script" "$passphrase")
+    "$tmp_expect_script" "$passphrase" > /dev/null 2> /dev/null
     result=$?
 
     if [ "$DEBUG" == "$TRUE" ]; then
       # Strip out ANSI color and cursor codes used by ZFS Boot Menu if present
-      echo "-- -- DEBUG:"
+      echo "-- -- DEBUG: Expect script output:"
       output=$(sed 's/\x1B[@A-Z\\\]^_]\|\x1B\[[0-9:;<=>?]*[-!"#$%&'"'"'()*+,.\/]*[][\\@A-Z^_`a-z{|}~]//g' < "$tmp_expect_log" | strings) 
       echo "$output"
     fi
