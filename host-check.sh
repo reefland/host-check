@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/15/2023"
-VERSION="0.09"
+VERSION="0.10"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -241,6 +241,10 @@ __detect_dropbear_port() {
 
       sleep "$dropbear_retry_delay"
     done # retries
+
+    if [[ "${retries}" -eq "${dropbear_retries}" ]]; then
+      __send_notification "ERROR: $hostname failed all ${dropbear_retries} Dropbear connection attempts. Host down?"
+    fi
 
     return $result
   else
