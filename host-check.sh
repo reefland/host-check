@@ -11,8 +11,8 @@
 #
 
 AUTHOR="Richard J. Durso"
-RELDATE="09/13/2023"
-VERSION="0.06"
+RELDATE="09/14/2023"
+VERSION="0.07"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -49,6 +49,13 @@ __usage() {
 
   Default configuration file: ${configfile}
   "
+}
+
+# ---[ Error Handler ]--------------------------------------------------------
+# Write error messages to STDERR.
+
+__error_message() {
+  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
 }
 
 # ---[ How to handle notifications ]------------------------------------------
@@ -188,7 +195,7 @@ EOF
     rm "$tmp_expect_script" "$tmp_expect_log"
     return $result
   else
-    echo "error: passphrase required in config file (be sure to wrap passphrase within single quotes!)" >&2
+    __error_message "error: passphrase required in config file (be sure to wrap passphrase within single quotes!)"
     exit 1
   fi
 }
@@ -224,7 +231,7 @@ __detect_dropbear_port() {
     done
     return $result
   else
-    echo "error: hostname required" >&2
+    __error_message "error: hostname required"
     exit 1
   fi
 }
@@ -249,7 +256,7 @@ __detect_ssh_ports() {
     done
     return $result
   else
-    echo "error: hostname required" >&2
+    __error_message "error: hostname required"
     exit 1
   fi
 }
@@ -313,12 +320,12 @@ __list_hosts_and_ports() {
 __load_config_file() {
   local configfile="$1"
 
-  echo "-- Loading configuration file: $configfile"
+  echo "-- ${0##*/} ${VERSION}: Loading configuration file: $configfile"
   if [ -f "$configfile" ]; then
     # shellcheck source=/dev/null
     source "$configfile"
   else
-    echo "error: configuration file not found." >&2
+    __error_message "error: configuration file not found."
     exit 2
   fi
 }
@@ -377,7 +384,7 @@ if [ "$#" -ne 0 ]; then
       break
       ;;
     -*)
-      echo "Invalid option '$1'. Use --help to see the valid options" >&2
+      __error_message "Invalid option '$1'. Use --help to see the valid options"
       exit 1
       ;;
     # an option argument, continue
