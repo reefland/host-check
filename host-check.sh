@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/25/2023"
-VERSION="0.15"
+VERSION="0.16"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -239,12 +239,13 @@ __detect_dropbear_port() {
         fi
       done # ports
 
-      sleep "$dropbear_retry_delay"
+      # Skip sleep if this was the last host to check
+      [[ "${retries}" -ne "${dropbear_retries}" ]] && sleep "$dropbear_retry_delay"
     done # retries
 
     if [[ "${retries}" -eq "${dropbear_retries}" ]]; then
       # Skip notification if host is known to be down
-      if ! __check_host_state "$hostname"
+      if __check_host_state "$hostname"
       then 
         __send_notification "ERROR: $hostname failed all ${dropbear_retries} Dropbear connection attempts. Host down?"
         __create_host_state "$hostname"
@@ -289,18 +290,23 @@ __detect_ssh_ports() {
 }
 
 # ---[ Create Host State File ]-----------------------------------------------
-# This will create a simmple file with the name of the host used to indicate
-# that host is down and reduce the number of alerts that might be generated
+# This will create a simple file with the name of the host used to indicate
+# that host is down. The datestamp in seconds (since the UNIX epoch) is written
+# to the file to track when it was marked as down. If the file already exists
+# do not create a new one, need to preserve the timestamp.
 
 __create_host_state() {
   local hostname="$1"
   local result=1
 
   if [[ -n "$hostname" ]]; then
-    if touch "${configdir}/${hostname}.down"
-      result=0
-    then
-      __error_message "error: unable to create host state file - ${configdir}/${hostname}.down"
+    if [[ ! -f "${configdir}/${hostname}.down" ]]; then
+      if date +%s > "${configdir}/${hostname}.down"
+      then
+        result=0
+      else
+        __error_message "error: unable to create host state file - ${configdir}/${hostname}.down"
+      fi
     fi
   else
     __error_message "error: hostname required"
@@ -312,8 +318,8 @@ __create_host_state() {
 
 # ---[ Check Host State File ]------------------------------------------------
 # Check if a Host State File exists for the specified host.  If it does exist
-# and is older than "host_state_retry_min" (minutes) delete the file. This
-# will allow a notification to be triggered again.
+# and is older than "host_state_retry_min" (minutes) then update timestamp to
+# now. This will allow a notification to be triggered again.
 
 __check_host_state() {
   local hostname="$1"
@@ -321,14 +327,15 @@ __check_host_state() {
 
   if [[ -n "$hostname" ]]; then
     if [[ -f "${configdir}/${hostname}.down" ]]; then
-      result=0
-      # if Host State Fails is older than retry minutes delete the file (allows next notifcaiotns again)
-      # return code that file nolonger exists
-      if find "${configdir}" -name "${hostname}.down" -mmin "+${host_state_retry_min}" -type f -delete | grep -q "." 
-      then
-        echo "-- -- Removed Host State File: ${hostname}.down"
-        result=1
+      # if Host State File is older than retry minutes, uptime timestamp (allows next notifications again)
+      # return code to allow notification
+      if [[ -n $(find "${configdir}" -name "${hostname}.down" -mmin "+${host_state_retry_min}" -type f) ]]; then
+        find "${configdir}" -name "${hostname}.down" -mmin "+${host_state_retry_min}" -type f -exec touch {} \;
+        result=0
       fi
+    else
+      # no existing host state file, return code to allow notification
+      result=0
     fi
   else
     __error_message "error: hostname required"
@@ -439,6 +446,7 @@ dropbear_ports=("222")
 dropbear_retries="3"
 dropbear_retry_delay="30" # seconds
 host_state_retry_min="59" # minutes
+host_state_failed_threshold="180" # minutes
 webhook="not_defined"
 passphrase=
 
