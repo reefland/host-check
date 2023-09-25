@@ -231,7 +231,7 @@ $ ls -l /usr/local/bin/host-check.sh
 
     * All hosts are up with SSH ports open, nothing to do!
 
-4. List Current Configuration:
+4. List Current Configuration (and status of tracked hosts):
 
     ```shell
     $ host-check.sh -l
@@ -244,6 +244,7 @@ $ ls -l /usr/local/bin/host-check.sh
     k3s04
     k3s05
     k3s06
+    testlinux [ Host marked down via state file /home/user/.config/host-check/testlinux.down since 2023-09-25T13:11:53-0400 ]
 
     SSH port(s) defined:
     22
