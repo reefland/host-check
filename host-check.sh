@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/25/2023"
-VERSION="0.17"
+VERSION="0.18"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -266,6 +266,7 @@ __detect_dropbear_port() {
 __detect_ssh_ports() {
   local hostname="$1"
   local result=1
+  local state=""
 
   if [[ -n "$hostname" ]]; then
     for port in "${ssh_ports[@]}"; do
@@ -281,7 +282,9 @@ __detect_ssh_ports() {
         # no need to check any additional ports
         break
       else
-        echo "Connection to $hostname ($(getent hosts "$hostname" | awk '{print $1}')) $port port failed!"
+        [[ -f "${configdir}/${hostname}.down" ]] && state="Host known to be down" || state="New incident detected!"
+
+        echo "Connection to ${hostname} ($(getent hosts "$hostname" | awk '{print $1}')) ${port} port failed! [${state}]"
       fi
     done
     return $result

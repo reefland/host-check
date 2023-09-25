@@ -175,6 +175,7 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $  host-check.sh -s testlinux
 
+    Connection to testlinux (192.168.10.110) 22 port failed! [Host known to be down]
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
     -- -- Dropbear port 222 is open on testlinux
@@ -193,6 +194,7 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $  host-check.sh --debug -s testlinux
 
+    Connection to testlinux (192.168.10.110) 22 port failed! [Host known to be down]
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
     -- -- Dropbear port 222 is open on testlinux
@@ -234,7 +236,7 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $ host-check.sh -l
 
-    -- host-check.sh 0.09: Loading configuration file: /home/user/.config/host-check/host-check.conf
+    -- host-check.sh v0.17: Loading configuration file: /home/user/.config/host-check/host-check.conf
     Hostname(s) defined:
     k3s01
     k3s02
