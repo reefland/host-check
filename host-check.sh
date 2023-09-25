@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/25/2023"
-VERSION="0.16"
+VERSION="0.17"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -54,7 +54,7 @@ __usage() {
 # Write error messages to STDERR.
 
 __error_message() {
-  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
+  echo "[$(date "$timestamp_format")]: $*" >&2
 }
 
 # ---[ How to handle notifications ]------------------------------------------
@@ -106,6 +106,7 @@ __dropbear_failed_payload() {
 
 # ---[ Answer Dropbear Passphrase ]-------------------------------------------
 # This could be customized for other Dropbear environments such as LUKS
+
 __answer_passphrase(){
   local hostname="$1"
   local passphrase="$2"
@@ -261,6 +262,7 @@ __detect_dropbear_port() {
 
 # ---[ Process SSH Ports ]----------------------------------------------------
 # detect if any of the defined ssh ports are active for specified host
+
 __detect_ssh_ports() {
   local hostname="$1"
   local result=1
@@ -344,6 +346,32 @@ __check_host_state() {
   return $result
 }
 
+# --- [ Get Host Down Duration ]-----------------------------------------------
+# Get the host down timestamp from the host down file and calculate down
+# duration to now in seconds. Returns number of seconds host has been down.
+
+__get_host_down_duration_seconds() {
+  local hostname="$1"
+  local result=1
+  local initial_down=""
+  local now=""
+
+  if [[ -n "$hostname" ]]; then
+    if [[ -f "${configdir}/${hostname}.down" ]]; then
+      initial_down=$(cat "${configdir}/${hostname}.down")
+      now=$(date +%s)
+      echo $((now - initial_down))
+    else
+      __error_message "error: host not down"
+      exit 2
+    fi
+  else
+    __error_message "error: hostname required"
+    exit 2
+  fi
+  return $result
+}
+
 # ---[ Remove Host State File ]------------------------------------------------
 # Delete specified Host State File if it exists
 
@@ -367,9 +395,12 @@ __remove_host_state() {
 # which indicates host is healthy.  If SSH ports are not open, the script will
 # detect if Dropbear ports are opened, if detected it will attempt to answer
 # passphrase prompt with the supplied passphrase
+
 __process_all_hostnames() {
   local passphrase="$1"
   local result=1
+  local host_down_seconds=""
+  local now=""
 
   for hostname in "${hostnames[@]}"; do
     __detect_ssh_ports "$hostname"
@@ -381,8 +412,16 @@ __process_all_hostnames() {
           # Passphrase was answered correctly
           break
         else
-          # Process user defined steps to handle failed dropbear
-          __dropbear_failed_payload "$hostname"
+          # See if host down is longer than host failed threshold
+          host_down_seconds=$(__get_host_down_duration_seconds "$hostname")
+          if [[ "$host_down_seconds" -gt $((host_state_failed_threshold * 60)) ]];then
+            # Process user defined steps to handle failed dropbear
+            __dropbear_failed_payload "$hostname"
+          else
+            # Calculate when host failed threshold will be reached
+            now=$(date +%s)
+            echo "-- Host $hostname failed threshold set at: $(date -d @$(( now + (host_state_failed_threshold * 60) - host_down_seconds)) "$timestamp_format")"
+          fi
         fi
         echo
       fi
@@ -391,6 +430,7 @@ __process_all_hostnames() {
 
 # --- [ List Hosts and Ports ]------------------------------------------------
 # List all hostnames and port numbers defined within this script.
+
 __list_hosts_and_ports() {
   echo "Hostname(s) defined:"
   for hostname in "${hostnames[@]}"; do
@@ -422,7 +462,7 @@ __list_hosts_and_ports() {
 __load_config_file() {
   local configfile="$1"
 
-  echo "-- ${0##*/} ${VERSION}: Loading configuration file: $configfile"
+  echo "-- ${0##*/} v${VERSION}: Loading configuration file: $configfile"
   if [ -f "$configfile" ]; then
     # shellcheck source=/dev/null
     source "$configfile"
@@ -436,6 +476,7 @@ __load_config_file() {
 FALSE=0
 TRUE=1
 DEBUG="$FALSE"
+timestamp_format="+%Y-%m-%dT%H:%M:%S%z"  # 2023-09-25T12:56:02-0400
 
 # Default values, use the config file to override these!
 configdir="$HOME/.config/host-check"
