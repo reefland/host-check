@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="09/25/2023"
-VERSION="0.18"
+VERSION="0.19"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -435,9 +435,21 @@ __process_all_hostnames() {
 # List all hostnames and port numbers defined within this script.
 
 __list_hosts_and_ports() {
+  local hostname=""
+  local port=""
+  local state=""
+  local now=""
+  
+  now=$(date +%s)
   echo "Hostname(s) defined:"
   for hostname in "${hostnames[@]}"; do
-    echo "$hostname"
+    if [[ -f "${configdir}/${hostname}.down" ]]; then
+      host_down_seconds=$(__get_host_down_duration_seconds "$hostname")
+      state="[ Host marked down via state file ${configdir}/${hostname}.down since $(date -d @$(( now - host_down_seconds)) "$timestamp_format") ]"
+    else
+      state=""
+    fi
+    echo "${hostname} ${state}" 
   done
 
   echo
