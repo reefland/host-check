@@ -11,8 +11,8 @@
 #
 
 AUTHOR="Richard J. Durso"
-RELDATE="09/15/2023"
-VERSION="0.10"
+RELDATE="09/25/2023"
+VERSION="0.15"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -39,9 +39,8 @@ __usage() {
   --debug           : Show expect screen scrape in progress.
   -c, --config      : Full path and name of configuration file.
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
-  -d, --dropbear    : Detect if dropbear ports are open on specified host.
+  -s, --single      : Process single host, all ports, all passphrase prompts.
   -l, --list        : List defined hostnames and ports within the script.
-  -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
   
@@ -69,14 +68,15 @@ __send_notification() {
   if [[ -n "$message" ]]; then
     if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook" > /dev/null 2> /dev/null
     then
-      echo "-- -- Notification sent"
+      echo "-- -- Notification sent (${message})"
     fi
   fi
 }
 
 # ---[ What to do when Dropbear unavilable or failed ]------------------------
 # This is user defined area of what to do if dropbear is not available or
-# failed.  
+# failed.  You can copy & paste this into your configuration file instead of
+# making modifications to this script.
 
 __dropbear_failed_payload() {
   local hostname="$1"
@@ -203,7 +203,7 @@ EOF
     return $result
   else
     __error_message "error: passphrase required in config file (be sure to wrap passphrase within single quotes!)"
-    exit 1
+    exit 2
   fi
 }
 
@@ -243,13 +243,18 @@ __detect_dropbear_port() {
     done # retries
 
     if [[ "${retries}" -eq "${dropbear_retries}" ]]; then
-      __send_notification "ERROR: $hostname failed all ${dropbear_retries} Dropbear connection attempts. Host down?"
+      # Skip notification if host is known to be down
+      if ! __check_host_state "$hostname"
+      then 
+        __send_notification "ERROR: $hostname failed all ${dropbear_retries} Dropbear connection attempts. Host down?"
+        __create_host_state "$hostname"
+      fi
     fi
 
     return $result
   else
     __error_message "error: hostname required"
-    exit 1
+    exit 2
   fi
 }
 
@@ -265,6 +270,11 @@ __detect_ssh_ports() {
       result=$?
 
       if [ $result -eq 0 ]; then
+        # Cleanup any previous host down state files (if exists)
+        if __remove_host_state "$hostname"
+        then
+          __send_notification "$hostname is now back on-line."
+        fi
         # no need to check any additional ports
         break
       else
@@ -274,8 +284,75 @@ __detect_ssh_ports() {
     return $result
   else
     __error_message "error: hostname required"
-    exit 1
+    exit 2
   fi
+}
+
+# ---[ Create Host State File ]-----------------------------------------------
+# This will create a simmple file with the name of the host used to indicate
+# that host is down and reduce the number of alerts that might be generated
+
+__create_host_state() {
+  local hostname="$1"
+  local result=1
+
+  if [[ -n "$hostname" ]]; then
+    if touch "${configdir}/${hostname}.down"
+      result=0
+    then
+      __error_message "error: unable to create host state file - ${configdir}/${hostname}.down"
+    fi
+  else
+    __error_message "error: hostname required"
+    exit 2
+  fi
+
+  return $result
+}
+
+# ---[ Check Host State File ]------------------------------------------------
+# Check if a Host State File exists for the specified host.  If it does exist
+# and is older than "host_state_retry_min" (minutes) delete the file. This
+# will allow a notification to be triggered again.
+
+__check_host_state() {
+  local hostname="$1"
+  local result=1
+
+  if [[ -n "$hostname" ]]; then
+    if [[ -f "${configdir}/${hostname}.down" ]]; then
+      result=0
+      # if Host State Fails is older than retry minutes delete the file (allows next notifcaiotns again)
+      # return code that file nolonger exists
+      if find "${configdir}" -name "${hostname}.down" -mmin "+${host_state_retry_min}" -type f -delete | grep -q "." 
+      then
+        echo "-- -- Removed Host State File: ${hostname}.down"
+        result=1
+      fi
+    fi
+  else
+    __error_message "error: hostname required"
+    exit 2
+  fi
+  return $result
+}
+
+# ---[ Remove Host State File ]------------------------------------------------
+# Delete specified Host State File if it exists
+
+__remove_host_state() {
+  local hostname="$1"
+  local result=1
+
+  if [[ -n "$hostname" ]]; then
+    if [[ -f "${configdir}/${hostname}.down" ]]; then
+      rm "${configdir}/${hostname}.down" && result=0
+    fi
+  else
+    __error_message "error: hostname required"
+    exit 2
+  fi
+  return $result
 }
 
 # ---[ Primary Monitoring Loop ]----------------------------------------------
@@ -354,14 +431,23 @@ TRUE=1
 DEBUG="$FALSE"
 
 # Default values, use the config file to override these!
-configfile="$HOME/.config/host-check/host-check.conf"
+configdir="$HOME/.config/host-check"
+configfile="${configdir}/host-check.conf"
 hostnames=("localhost")
 ssh_ports=("22")
 dropbear_ports=("222")
 dropbear_retries="3"
-dropbear_retry_delay="30"
+dropbear_retry_delay="30" # seconds
+host_state_retry_min="59" # minutes
 webhook="not_defined"
 passphrase=
+
+# Make sure directory to hold state information exists
+if ! mkdir -p "${configdir}"
+then
+  __error_message "error: unable to create state directory: ${configdir}"
+  exit 2
+fi
 
 # --- [ Process Argument List ]-----------------------------------------------
 if [ "$#" -ne 0 ]; then
@@ -374,11 +460,6 @@ if [ "$#" -ne 0 ]; then
       ;;
     -c|--config)
       configfile=$2
-      ;;
-    -d|--dropbear)
-      hostname=$2
-      __load_config_file "$configfile"
-      __detect_dropbear_port "$hostname" "$passphrase"
       ;;
     --debug)
       DEBUG="$TRUE"
@@ -394,7 +475,8 @@ if [ "$#" -ne 0 ]; then
     -s|--ssh)
       hostname=$2
       __load_config_file "$configfile"
-      __detect_ssh_ports "$hostname"
+      hostnames=("$hostname")
+      __process_all_hostnames "$passphrase"
       ;;
     -v|--version)
       echo "$VERSION"
@@ -405,7 +487,7 @@ if [ "$#" -ne 0 ]; then
       ;;
     -*)
       __error_message "Invalid option '$1'. Use --help to see the valid options"
-      exit 1
+      exit 2
       ;;
     # an option argument, continue
     *)  ;;

@@ -94,14 +94,14 @@ passphrase='mySecret!'
 
 ### Modifications
 
-There are 2 routines within the script you may want to consider making modifications:
+There are some routines within the script you may want to consider making modifications. Instead of editing the script directly, simply cut & paste the default routine from the script and place it in the config file (`host-check.conf`).  Customize the version within your config file.
 
 * `__send_notification()` is called to send a notification.  By default it sends a webhook notification to the URL specified in variable `$webhook`.
   * If you would rather an email, then you can modify this to use `mailx` or some other email client.  The content of the notification is in variable `$message`.
 
 * `__dropbear_failed_payload()` is called when no SSH ports are detected, no dropbear ports are detected or the passphrase to unlock the volume failed.
   * Often there is nothing you can do about it, just needs a human to investigate.
-  * The example shows self-hosted kubernetes nodes having a `taint` applied which notified the rest of the cluster that this host will not be available until a human does something.
+  * The example within the script shows self-hosted kubernetes nodes having a `taint` applied which notified the rest of the cluster that this host will not be available until a human does something.
   * The variable `$hostname` will contain the name of the host having an issue.
 
 * `__answer_passphrase()` can be modified if you use LUKS encryption.  You would add an entry with the passphrase text prompt to look for modeled after this entry:
@@ -138,7 +138,7 @@ $ ls -l /usr/local/bin/host-check.sh
 ### Usage Statement
 
 ```text
-  host-check.sh | Version: 0.06 | 09/13/2023 | Richard J. Durso
+  host-check.sh | Version: 0.15 | 09/25/2023 | Richard J. Durso
 
   Check if hosts are stuck at Dropbear passphrase prompt.
   ----------------------------------------------------------------------------
@@ -151,9 +151,8 @@ $ ls -l /usr/local/bin/host-check.sh
   --debug           : Show expect screen scrape in progress.
   -c, --config      : Full path and name of configuration file.
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
-  -d, --dropbear    : Detect if dropbear ports are open on specified host.
+  -s, --single      : Process single host, all ports, all passphrase prompts.
   -l, --list        : List defined hostnames and ports within the script.
-  -s, --ssh         : Detect if ssh ports are open on specified host.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
   
@@ -169,7 +168,7 @@ $ ls -l /usr/local/bin/host-check.sh
 1. Individual Host with Successful Passphrase:
 
     ```shell
-    $  host-check.sh -d testlinux
+    $  host-check.sh -s testlinux
 
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
@@ -187,7 +186,7 @@ $ ls -l /usr/local/bin/host-check.sh
 2. Individual Host with Debug Mode and Successful Passphrase:
 
     ```shell
-    $  host-check.sh --debug -d testlinux
+    $  host-check.sh --debug -s testlinux
 
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
