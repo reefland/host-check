@@ -58,6 +58,12 @@ Configuration is defined via an external configuration file.
 # Define array of hostnames to loop over:
 hostnames=("k3s01" "k3s02" "k3s03" "k3s04" "k3s05" "k3s06")
 
+# Passphrase to unlock remote dropbear volumes (Use single quotes!) 
+passphrase='mySecret!'
+
+# Webhook Notifications used in __send_notification() subroutine
+webhook="https://hooks.slack.com/<webhook_uri_here>"
+
 # Define array of possible SSH ports to check:
 ssh_ports=("22")
 
@@ -71,25 +77,24 @@ dropbear_retries="6"
 # How many seconds delay between dropbear connection attempts
 dropbear_retry_delay="20"
 
-# Webhook Notifications used in __send_notification() subroutine
-webhook="https://hooks.slack.com/<webhook_uri_here>"
+# Delay in minutes to wait between notifications of host down (reduces spamming alerts)
+host_state_retry_min="59"
 
-# Passphrase to unlock remote dropbear volumes (Use single quotes!) 
-passphrase='mySecret!'
+# How many minutes must a host be down before calling __dropbear_failed_payload()
+host_state_failed_threshold="180" 
 ```
 
-* `hostnames` is BASH array of hostnames that will be checked each time the script is run when a `-a` or `--all` parameter is passed.
-* `ssh_ports` is a BASH array of SSH port numbers to check. Typically just `22` is used, but alternate ports can be specified.
-  * If any of the `ssh_ports` ports are detected to be `open` then the remote host is fully booted and not waiting for a passphrase.  No other action is taken, next host is checked.
-* `dropbear_ports` is a BASH array of SSH port numbers to check. Typical numbers are `222` or `2222`, additional ports can be added if needed.
-  * If any of these ports are detected to be `open` then the host is waiting for a passphrase. The Host-Check script will then attempt to answer the passphrase prompt.
-  * If the remote host has neither SSH or Dropbear ports open, then the host is powered off, hung or some other error condition.  A notification can be sent when this is detected.
-* `dropbear_retries` is an integer number of how many times to check all defined Dropbear ports for a connection before returning a failed/host down status.
-* `dropbear_retry_delay` is an integer number of how many seconds to wait between Dropbear connection attempts.
-* `webhook` can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Mattermost, etc.
-* `passphrase` is the password or passphrase needed to unlock remote disk volumes via Dropbear.
-  * This value needs to be wrapped by single-quotes to prevent shell processing of special characters.
-
+| Variable  | Description |
+|---        |---          |
+|`hostnames`  | is BASH array of hostnames that will be checked each time the script is run when a `-a` or `--all` parameter is passed. |
+|`passphrase` | is the password or passphrase needed to unlock remote disk volumes via Dropbear.  This value needs to be wrapped by single-quotes to prevent shell processing of special characters. |
+|`webhook`    | can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Mattermost, etc. |
+|`ssh_ports`  | is a BASH array of SSH port numbers to check. Typically just `22` is used, but alternate ports can be specified. If any of the `ssh_ports` ports are detected to be `open` then the remote host is assumed to be fully booted and not waiting for a passphrase.  No other action is taken, next host is checked. |
+|`dropbear_ports` | is a BASH array of SSH port numbers to check. Typical numbers are `222` or `2222`, additional ports can be added if needed. If any of these ports are detected to be `open` then the host is waiting for a passphrase. The Host-Check script will then attempt to answer the passphrase prompt. If the remote host has neither SSH or Dropbear ports open, then the host is powered off, hung or some other error condition.  A notification can be sent when this is detected. |
+|`dropbear_retries` | is an integer number of how many times to check all defined Dropbear ports for a connection before returning a failed/host down status. |
+|`dropbear_retry_delay` | is an integer number of how many seconds to wait between Dropbear connection attempts.|
+|`host_state_retry_min` | is an integer number of how many consecutive minutes to wait before sending next alert when a host is down.  This is to help reduce the amount of spam alerts messages generated.  |
+|`host_state_failed_threshold`  | is an integer number of how many consecutive minutes a host needs to be down before sub-routine __dropbear_failed_payload() is executed. |
 ---
 
 ### Modifications
@@ -219,7 +224,7 @@ $ ls -l /usr/local/bin/host-check.sh
     Connection to k3s03 (192.168.10.217) 22 port [tcp/*] succeeded!
     Connection to k3s04 (192.168.10.218) 22 port [tcp/*] succeeded!
     Connection to k3s05 (192.168.10.219) 22 port [tcp/*] succeeded!
-    Connection to k3s06 (192.168.10.210) 22 port [tcp/*] succeeded!
+    Connection to k3s06 (192.168.10.220) 22 port [tcp/*] succeeded!
     ```
 
     * All hosts are up with SSH ports open, nothing to do!
