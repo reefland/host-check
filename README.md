@@ -11,11 +11,12 @@ This BASH script is intended to check if remote hosts are waiting at a passphras
 
 ## Features
 
-* Scan a single remote host or predefined list of remote hosts
+* Scan a single remote host or predefined list of remote hosts.
 * Multiple SSH ports can be checked (for people who don't like using `22`) - _if SSH is available, then host is healthy and not at passphrase prompt._
-* Multiple Dropbear SSH ports can be checked
-* Easily customized notification on results of passphrase (mailx, slack webhook, etc)
-* Customizable steps to take upon Dropbear passphrase failure
+* Multiple Dropbear SSH ports can be checked.
+* Easily customized notification on results of passphrase (mailx, slack or Discord webhook, etc.)
+* Customizable steps to take upon Dropbear passphrase failure.
+* Heartbeat health checks can be enabled to monitoring service like [healthchecks.io](https://healthchecks.io/) to alert you if this script stops processing.
 
 ---
 
@@ -64,6 +65,13 @@ passphrase='mySecret!'
 # Webhook Notifications used in __send_notification() subroutine
 webhook="https://hooks.slack.com/<webhook_uri_here>"
 
+# Webhook to "monitor the monitor". Send notification on each run to healthchecks.io
+# to get an alert if this stops running.
+healthcheck="https://<webhook_uti_here>"
+
+# Set to 1 to enable heart beat health check, anything else to disable.
+enable_healthcheck=0
+
 # Define array of possible SSH ports to check:
 ssh_ports=("22")
 
@@ -88,7 +96,9 @@ host_state_failed_threshold="180"
 |---        |---          |
 |`hostnames`  | is BASH array of hostnames that will be checked each time the script is run when a `-a` or `--all` parameter is passed. |
 |`passphrase` | is the password or passphrase needed to unlock remote disk volumes via Dropbear.  This value needs to be wrapped by single-quotes to prevent shell processing of special characters. |
-|`webhook`    | can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Mattermost, etc. |
+|`webhook`    | can be populated with a webhook URL of your choice to send a notification to.  This allows easy notifications to Slack, Discord, Mattermost, etc. |
+|`healthcheck`| a heartbeat webhook sent to a push notification service such as healthchecks.io to monitor this script is working at expected intervals. |
+|`enable_healthcheck`| a simple toggle to enable / disable sending a heartbeat webhook. |
 |`ssh_ports`  | is a BASH array of SSH port numbers to check. Typically just `22` is used, but alternate ports can be specified. If any of the `ssh_ports` ports are detected to be `open` then the remote host is assumed to be fully booted and not waiting for a passphrase.  No other action is taken, next host is checked. |
 |`dropbear_ports` | is a BASH array of SSH port numbers to check. Typical numbers are `222` or `2222`, additional ports can be added if needed. If any of these ports are detected to be `open` then the host is waiting for a passphrase. The Host-Check script will then attempt to answer the passphrase prompt. If the remote host has neither SSH or Dropbear ports open, then the host is powered off, hung or some other error condition.  A notification can be sent when this is detected. |
 |`dropbear_retries` | is an integer number of how many times to check all defined Dropbear ports for a connection before returning a failed/host down status. |
@@ -102,8 +112,13 @@ host_state_failed_threshold="180"
 
 There are some routines within the script you may want to consider making modifications. Instead of editing the script directly, simply cut & paste the default routine from the script and place it in the config file (`host-check.conf`).  Customize the version within your config file.
 
-* `__send_notification()` is called to send a notification.  By default it sends a webhook notification to the URL specified in variable `$webhook`.
-  * If you would rather an email, then you can modify this to use `mailx` or some other email client.  The content of the notification is in variable `$message`.
+* `__send_notification()` is called to send a notification.  
+  * By default it sends a webhook notification to the URL specified in variable `$webhook`.
+  * If you would rather send an email, then you can modify this to use `mailx` or some other email client.  The content of the notification is in variable `$message`.
+
+* `__send_heartbeat()` is called each time the `-a` or `--all` (process all hosts) switch it used. This sends a message (webhook, email, etc) to monitoring service used as a heartbeat that this script is operating as expected. (This has nothing to do with status of scanned hosts).
+  * By default it sends a heartbeat to the URL specified in variable `$healthcheck` if variable `$enable_healthcheck` is set to `1` to enable this.
+  * If you would rather send an email, then you can modify this to use `mailx` or some other email client.
 
 * `__dropbear_failed_payload()` is called when no SSH ports are detected, no dropbear ports are detected or the passphrase to unlock the volume failed.
   * Often there is nothing you can do about it, just needs a human to investigate.
@@ -223,12 +238,14 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $ host-check.sh -a
 
+    -- host-check.sh v0.21: Loading configuration file: /home/user/.config/host-check/host-check.conf
     Connection to k3s01 (192.168.10.215) 22 port [tcp/*] succeeded!
     Connection to k3s02 (192.168.10.216) 22 port [tcp/*] succeeded!
     Connection to k3s03 (192.168.10.217) 22 port [tcp/*] succeeded!
     Connection to k3s04 (192.168.10.218) 22 port [tcp/*] succeeded!
     Connection to k3s05 (192.168.10.219) 22 port [tcp/*] succeeded!
     Connection to k3s06 (192.168.10.220) 22 port [tcp/*] succeeded!
+     -- -- Heartbeat sent (OK)
     ```
 
     * All hosts are up with SSH ports open, nothing to do!

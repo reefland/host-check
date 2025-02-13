@@ -12,7 +12,7 @@
 
 AUTHOR="Richard J. Durso"
 RELDATE="02/13/2025"
-VERSION="0.20"
+VERSION="0.21"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -72,9 +72,32 @@ __send_notification() {
 
   # Send notification via webhook
   if [[ -n "$message" ]]; then
-    if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook"
+    if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook" > /dev/null 2> /dev/null
     then
       echo "-- -- Notification sent (${message})"
+    fi
+  fi
+}
+
+# ---[ Process health check heartbeat for Monitoring ]-------------------------
+# This script can signal a heartbeat to a monitoring service to notify this
+# script has run to completion. If this script stops running (cron issue, host
+# issue, etc.) then the monitoring service can alert you to a problem. If this
+# script is scheduled to run every 5 minutes, you can configure the monitor to
+# sent you an alert after 7 minutes without a heartbeat for example.
+
+__send_heartbeat() {
+  if [[ "$enable_healthcheck" == "$TRUE" ]]; then
+    # Confirm a  has been defined
+    if [[ -z "$healthcheck" || "$healthcheck" == "not_defined" ]]; then
+      __error_message "error: __send_heartbeat() to healthcheck, but healthcheck has not been defined."
+    fi
+
+    if curl -m 10 --retry 5 "$healthcheck" > /dev/null 2> /dev/null
+    then
+      echo "-- -- Heartbeat sent (OK)"
+    else
+      __error_message "error: __send_heartbeat() to healthcheck failed"
     fi
   fi
 }
@@ -435,6 +458,8 @@ __process_all_hostnames() {
         echo
       fi
   done
+  
+  __send_heartbeat
 }
 
 # --- [ List Hosts and Ports ]------------------------------------------------
@@ -509,7 +534,9 @@ dropbear_retries="3"
 dropbear_retry_delay="30" # seconds
 host_state_retry_min="59" # minutes
 host_state_failed_threshold="180" # minutes
+enable_healthcheck="$FALSE"
 webhook="not_defined"
+healthcheck="not_defined"
 passphrase=
 
 # Make sure directory to hold state information exists
