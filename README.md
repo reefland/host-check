@@ -95,6 +95,7 @@ host_state_failed_threshold="180"
 |`dropbear_retry_delay` | is an integer number of how many seconds to wait between Dropbear connection attempts.|
 |`host_state_retry_min` | is an integer number of how many consecutive minutes to wait before sending next alert when a host is down.  This is to help reduce the amount of spam alerts messages generated.  |
 |`host_state_failed_threshold`  | is an integer number of how many consecutive minutes a host needs to be down before sub-routine __dropbear_failed_payload() is executed. |
+
 ---
 
 ### Modifications
@@ -143,7 +144,7 @@ $ ls -l /usr/local/bin/host-check.sh
 ### Usage Statement
 
 ```text
-  host-check.sh | Version: 0.15 | 09/25/2023 | Richard J. Durso
+  host-check.sh | Version: 0.20 | 02/13/2025 | Richard J. Durso
 
   Check if hosts are stuck at Dropbear passphrase prompt.
   ----------------------------------------------------------------------------
@@ -158,6 +159,7 @@ $ ls -l /usr/local/bin/host-check.sh
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
   -s, --single      : Process single host, all ports, all passphrase prompts.
   -l, --list        : List defined hostnames and ports within the script.
+  -t, --test        : Send test message to defined notifications.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
   
@@ -256,3 +258,16 @@ $ ls -l /usr/local/bin/host-check.sh
 
     Unlock passphrase has been defined.
     ```
+
+5. Test notifications:
+
+    ```shell
+    $ ./host-check.sh -t
+
+    -- host-check.sh v0.20: Loading configuration file: /home/user/.config/host-check/host-check.conf
+    ok-- -- Notification sent (Test message from host-check.sh)
+    ```
+
+    * If webhooks or other notifications are defined within `__send_notification()` then a test message will be sent:
+
+    ![test-message-results](./docs/discord_notification_sucessful_test.png)

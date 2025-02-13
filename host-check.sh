@@ -11,8 +11,8 @@
 #
 
 AUTHOR="Richard J. Durso"
-RELDATE="09/25/2023"
-VERSION="0.19"
+RELDATE="02/13/2025"
+VERSION="0.20"
 ##############################################################################
 
 ### [ Routines ] #############################################################
@@ -41,6 +41,7 @@ __usage() {
   -a, --all         : Process all hosts, all ports, all passphrase prompts.
   -s, --single      : Process single host, all ports, all passphrase prompts.
   -l, --list        : List defined hostnames and ports within the script.
+  -t, --test        : Send test message to defined notifications.
   -h, --help        : This usage statement.
   -v, --version     : Return script version.
   
@@ -64,9 +65,14 @@ __error_message() {
 __send_notification() {
   local message="$1"
 
+  # Confirm a webhook has been defined
+  if [[ -z "$webhook" || "$webhook" == "not_defined" ]]; then
+    __error_message "error: __send_notification() to webhook, but webhook has not been defined."
+  fi
+
   # Send notification via webhook
   if [[ -n "$message" ]]; then
-    if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook" > /dev/null 2> /dev/null
+    if curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$message"'"}' "$webhook"
     then
       echo "-- -- Notification sent (${message})"
     fi
@@ -542,6 +548,10 @@ if [ "$#" -ne 0 ]; then
       hostnames=("$hostname")
       __process_all_hostnames "$passphrase"
       ;;
+    -t|--test)
+      __load_config_file "$configfile"
+      __send_notification "Test message from ${0##*/}"
+    ;;
     -v|--version)
       echo "$VERSION"
       exit 0
