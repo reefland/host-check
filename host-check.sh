@@ -179,7 +179,7 @@ expect {
     exp_continue
   }
 
-  # This woudl be seen with traditional ZFS on Root
+  # This would be seen with traditional ZFS on Root
   "Pool Decrypted" {
     set ret 0
     send_log -- "\rDEBUG: Pool Decrypted keywords detected\r"
