@@ -73,7 +73,7 @@ __send_notification() {
   fi
 }
 
-# ---[ What to do when Dropbear unavilable or failed ]------------------------
+# ---[ What to do when Dropbear unavailable or failed ]------------------------
 # This is user defined area of what to do if dropbear is not available or
 # failed.  You can copy & paste this into your configuration file instead of
 # making modifications to this script.
@@ -93,7 +93,7 @@ __dropbear_failed_payload() {
 #  fi
 
 #  if [ $result -eq 0 ]; then
-#    message="Node taints to fence $hostname sucessful."
+#    message="Node taints to fence $hostname successful."
 #  else
 #    message="FAILED to apply node taints on $hostname."
 #  fi
@@ -146,7 +146,7 @@ expect {
     exit \$ret
   }
 
-  # Logoin prompt would be a good sign too
+  # Login prompt would be a good sign too
   "login:" {
     set ret 0
     send_log -- "\rDEBUG: Login prompt detected\r"
