@@ -175,7 +175,7 @@ $ ls -l /usr/local/bin/host-check.sh
     ```shell
     $  host-check.sh -s testlinux
 
-    Connection to testlinux (192.168.10.110) 22 port failed! [Host known to be down]
+    Connection to testlinux (192.168.10.110) 22 port failed! [New incident detected!]
     -- Dropbear check on host: testlinux
     Connection to testlinux (192.168.10.110) 222 port [tcp/rsh-spx] succeeded!
     -- -- Dropbear port 222 is open on testlinux
